@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-11-15
+
+### Added
+- **System Updates Check**: Verify macOS version, check for security updates and patches
+- **Application Updates Check**: Check Homebrew, App Store (via mas-cli), npm, pip, and gem packages for updates
+- **Driver and Hardware Check**: Comprehensive hardware diagnostics including:
+  - Firmware update verification
+  - Storage controller and health checks
+  - Display and graphics drivers
+  - USB device enumeration
+  - Bluetooth status
+  - Wi-Fi driver information
+  - Audio device verification
+  - Battery health analysis (cycle count, condition)
+  - Non-Apple kernel extensions listing
+  - System performance metrics
+
+### Changed
+- Total operations increased from 20 to 23 categories
+- Enhanced maintenance report to include update and hardware check results
+- Updated documentation to reflect new features
+
 ## [1.0.0] - 2025-11-15
 
 ### Added

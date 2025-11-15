@@ -19,7 +19,7 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Configuration
-SCRIPT_VERSION="1.0.0"
+SCRIPT_VERSION="1.1.0"
 SCRIPT_NAME="macOS Maintenance Script"
 START_TIME=$(date +%s)
 LOG_FILE="/tmp/mac_maintenance_$(date +%Y%m%d_%H%M%S).log"
@@ -53,6 +53,9 @@ declare -A RISK_LEVELS=(
     ["icloud_cache"]="MEDIUM"
     ["language_cleanup"]="MEDIUM"
     ["login_items"]="LOW"
+    ["system_updates"]="LOW"
+    ["app_updates"]="LOW"
+    ["driver_check"]="LOW"
 )
 
 ################################################################################
@@ -998,7 +1001,193 @@ reset_network() {
     log_success "Network reset completed"
 }
 
-# 21. Additional System Optimizations
+# 21. System Updates Check
+check_system_updates() {
+    if ! confirm_operation "system_updates" "Check for macOS system updates and security patches"; then
+        return
+    fi
+    
+    log_info "Starting system updates check..."
+    local ops=0
+    local total_ops=5
+    
+    # Check for available updates
+    show_progress $((++ops)) $total_ops "Checking for macOS updates"
+    log_info "Checking for available system updates..."
+    softwareupdate --list 2>&1 | tee -a "$LOG_FILE"
+    
+    # Show current macOS version
+    show_progress $((++ops)) $total_ops "Checking current macOS version"
+    local current_version=$(sw_vers -productVersion)
+    local build_version=$(sw_vers -buildVersion)
+    log_info "Current macOS version: $current_version (Build: $build_version)"
+    
+    # Check for critical updates
+    show_progress $((++ops)) $total_ops "Checking for critical security updates"
+    local critical_updates=$(softwareupdate --list 2>&1 | grep -c "recommended" || echo "0")
+    if [ "$critical_updates" -gt 0 ]; then
+        log_warning "Found $critical_updates recommended security updates"
+        log_info "To install updates, run: sudo softwareupdate --install --all"
+    else
+        log_success "No critical security updates pending"
+    fi
+    
+    # Check automatic update settings
+    show_progress $((++ops)) $total_ops "Checking automatic update settings"
+    defaults read /Library/Preferences/com.apple.SoftwareUpdate AutomaticCheckEnabled 2>&1 | tee -a "$LOG_FILE"
+    
+    # Show last update check time
+    show_progress $((++ops)) $total_ops "Checking last update verification"
+    defaults read /Library/Preferences/com.apple.SoftwareUpdate LastFullSuccessfulDate 2>&1 | tee -a "$LOG_FILE"
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "System updates check completed"
+}
+
+# 22. Application Updates Check
+check_app_updates() {
+    if ! confirm_operation "app_updates" "Check for application updates (Homebrew, App Store, etc.)"; then
+        return
+    fi
+    
+    log_info "Starting application updates check..."
+    local ops=0
+    local total_ops=6
+    
+    # Check Homebrew updates
+    show_progress $((++ops)) $total_ops "Checking Homebrew packages"
+    if command -v brew &> /dev/null; then
+        log_info "Homebrew is installed - checking for outdated packages"
+        brew update 2>&1 | tee -a "$LOG_FILE"
+        local outdated=$(brew outdated | wc -l | tr -d ' ')
+        if [ "$outdated" -gt 0 ]; then
+            log_warning "Found $outdated outdated Homebrew packages:"
+            brew outdated 2>&1 | tee -a "$LOG_FILE"
+            log_info "To update: brew upgrade"
+        else
+            log_success "All Homebrew packages are up to date"
+        fi
+    else
+        log_info "Homebrew not installed (optional package manager)"
+    fi
+    
+    # Check App Store updates
+    show_progress $((++ops)) $total_ops "Checking App Store updates"
+    if command -v mas &> /dev/null; then
+        log_info "Checking App Store for updates..."
+        mas outdated 2>&1 | tee -a "$LOG_FILE"
+        log_info "To update App Store apps: mas upgrade"
+    else
+        log_info "mas-cli not installed - check App Store manually for updates"
+        log_info "Install mas-cli with: brew install mas"
+    fi
+    
+    # Check for npm global packages
+    show_progress $((++ops)) $total_ops "Checking npm global packages"
+    if command -v npm &> /dev/null; then
+        log_info "Checking outdated npm global packages..."
+        npm outdated -g 2>&1 | tee -a "$LOG_FILE" || log_info "All npm packages up to date"
+    else
+        log_info "npm not installed"
+    fi
+    
+    # Check for pip packages
+    show_progress $((++ops)) $total_ops "Checking pip packages"
+    if command -v pip3 &> /dev/null; then
+        log_info "Checking outdated pip packages..."
+        pip3 list --outdated 2>&1 | tee -a "$LOG_FILE" || log_info "All pip packages up to date"
+    else
+        log_info "pip3 not installed"
+    fi
+    
+    # Check for gem packages
+    show_progress $((++ops)) $total_ops "Checking Ruby gems"
+    if command -v gem &> /dev/null; then
+        log_info "Checking outdated Ruby gems..."
+        gem outdated 2>&1 | tee -a "$LOG_FILE" || log_info "All gems up to date"
+    else
+        log_info "Ruby gems not installed"
+    fi
+    
+    # System applications version check
+    show_progress $((++ops)) $total_ops "Listing system applications"
+    log_info "Key system applications versions:"
+    system_profiler SPApplicationsDataType 2>/dev/null | grep -A 2 "Safari\|Mail\|Messages\|Photos" | tee -a "$LOG_FILE" || log_info "Application data not available"
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "Application updates check completed"
+}
+
+# 23. Driver and Hardware Check
+check_drivers_hardware() {
+    if ! confirm_operation "driver_check" "Check hardware drivers, firmware, and system health"; then
+        return
+    fi
+    
+    log_info "Starting driver and hardware check..."
+    local ops=0
+    local total_ops=10
+    
+    # Check for available firmware updates
+    show_progress $((++ops)) $total_ops "Checking for firmware updates"
+    log_info "Checking for available firmware updates..."
+    system_profiler SPiBridgeDataType 2>/dev/null | tee -a "$LOG_FILE" || log_info "iBridge data not available"
+    
+    # Check storage drivers
+    show_progress $((++ops)) $total_ops "Checking storage drivers and health"
+    log_info "Storage controller information:"
+    system_profiler SPNVMeDataType SPSerialATADataType 2>/dev/null | head -30 | tee -a "$LOG_FILE"
+    
+    # Check display drivers
+    show_progress $((++ops)) $total_ops "Checking display information"
+    log_info "Display and graphics information:"
+    system_profiler SPDisplaysDataType 2>/dev/null | head -30 | tee -a "$LOG_FILE"
+    
+    # Check USB devices and drivers
+    show_progress $((++ops)) $total_ops "Checking USB devices"
+    log_info "USB devices connected:"
+    system_profiler SPUSBDataType 2>/dev/null | grep -A 5 "Product ID\|Manufacturer" | head -30 | tee -a "$LOG_FILE"
+    
+    # Check Bluetooth status
+    show_progress $((++ops)) $total_ops "Checking Bluetooth status"
+    log_info "Bluetooth information:"
+    system_profiler SPBluetoothDataType 2>/dev/null | head -20 | tee -a "$LOG_FILE"
+    
+    # Check Wi-Fi drivers and status
+    show_progress $((++ops)) $total_ops "Checking Wi-Fi status"
+    log_info "Wi-Fi information:"
+    system_profiler SPAirPortDataType 2>/dev/null | head -30 | tee -a "$LOG_FILE"
+    
+    # Check audio drivers
+    show_progress $((++ops)) $total_ops "Checking audio devices"
+    log_info "Audio devices:"
+    system_profiler SPAudioDataType 2>/dev/null | head -30 | tee -a "$LOG_FILE"
+    
+    # Check battery health (for laptops)
+    show_progress $((++ops)) $total_ops "Checking battery health"
+    log_info "Battery information:"
+    system_profiler SPPowerDataType 2>/dev/null | grep -A 10 "Health\|Cycle Count\|Condition" | tee -a "$LOG_FILE"
+    pmset -g batt 2>&1 | tee -a "$LOG_FILE"
+    
+    # Check for kernel extensions
+    show_progress $((++ops)) $total_ops "Checking loaded kernel extensions"
+    log_info "Non-Apple kernel extensions:"
+    kextstat | grep -v com.apple | head -20 | tee -a "$LOG_FILE"
+    
+    # Check system load and performance
+    show_progress $((++ops)) $total_ops "Checking system performance"
+    log_info "System load and memory:"
+    uptime | tee -a "$LOG_FILE"
+    vm_stat | head -10 | tee -a "$LOG_FILE"
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "Driver and hardware check completed"
+}
+
+# 24. Additional System Optimizations
 additional_optimizations() {
     log_info "Performing additional system optimizations..."
     local ops=0
@@ -1109,7 +1298,10 @@ The following maintenance operations were successfully completed:
 10. ✅ Daemon Operations - System daemons reloaded
 11. ✅ Kernel Extensions - Kext cache rebuilt
 12. ✅ Font Cache - Font caches cleared
-13. ✅ Additional Optimizations - Various system tweaks
+13. ✅ System Updates Check - macOS and security updates verified
+14. ✅ Application Updates Check - Third-party software updates checked
+15. ✅ Driver and Hardware Check - System health and drivers verified
+16. ✅ Additional Optimizations - Various system tweaks
 
 EOF
     fi
@@ -1254,7 +1446,7 @@ main() {
     echo ""
     
     # Count total operations
-    TOTAL_OPERATIONS=20
+    TOTAL_OPERATIONS=23
     
     echo -e "${YELLOW}${BOLD}"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -1291,6 +1483,9 @@ main() {
     cleanup_language_files
     check_login_items
     reset_network
+    check_system_updates
+    check_app_updates
+    check_drivers_hardware
     additional_optimizations
     
     # Generate report

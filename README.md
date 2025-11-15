@@ -10,6 +10,8 @@ A powerful, exhaustive maintenance script specifically designed for MacBook Air 
 - ✅ **Optimization**: Database optimization for Mail, Safari, Photos, and more
 - ✅ **Disk Management**: Verification, repair, and permission fixes
 - ✅ **Network Operations**: DNS flush, network reset, daemon management
+- ✅ **System Updates**: Check for macOS, security, and application updates
+- ✅ **Hardware Health**: Driver verification, firmware, and system diagnostics
 - ✅ **Progress Tracking**: Real-time progress bar with ETA calculation
 - ✅ **Risk Assessment**: Each operation shows LOW/MEDIUM/HIGH risk level
 - ✅ **User Confirmation**: Confirm each category before execution
@@ -44,6 +46,11 @@ A powerful, exhaustive maintenance script specifically designed for MacBook Air 
 #### High-Risk Operations
 19. **Kernel Extensions** - Kext cache rebuild (requires reboot)
 20. **Network Reset** - Complete network configuration reset
+
+#### System Maintenance & Updates (Low-Risk)
+21. **System Updates Check** - Check for macOS and security updates
+22. **Application Updates Check** - Check Homebrew, App Store, npm, pip, gem updates
+23. **Driver & Hardware Check** - Verify drivers, firmware, and system health
 
 #### Additional Optimizations
 - Notification Center database cleanup
