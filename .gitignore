@@ -1,0 +1,25 @@
+# Logs
+*.log
+
+# Temporary files
+/tmp/
+*.tmp
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Report files (user-generated)
+maintenance_report_*.md
+
+# Backup files
+*.bak
+*.backup
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
