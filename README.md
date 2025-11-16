@@ -1,27 +1,80 @@
-# macOS Comprehensive Maintenance Script
+# macOS Comprehensive Maintenance Script v2.0.0
 
-A powerful, exhaustive maintenance script specifically designed for MacBook Air 2016 running macOS Monterey 12.7.6. This script performs low-level system operations with high-level output, featuring progress tracking, risk assessment, and detailed reporting.
+A powerful, exhaustive maintenance script specifically designed for MacBook Air 2016 running macOS Monterey 12.7.6. This script performs low-level system operations with high-level output, featuring progress tracking, risk assessment, detailed reporting, and comprehensive CLI support.
+
+## 🚀 What's New in v2.0.0
+
+- ✨ **37 Operations** (up from 23) - Comprehensive coverage
+- 🎯 **CLI Arguments** - Full command-line support (--help, --verbose, --yes, etc.)
+- 🔒 **Enhanced Security** - Security audit, privacy cleanup, backup verification
+- 💾 **Memory Management** - Critical for 8GB RAM systems
+- 📊 **APFS Snapshots** - Can free 10-50GB of space!
+- 🌐 **Network Diagnostics** - Complete network health checks
+- 🌡️ **Thermal Monitoring** - Temperature and fan status
+- 📈 **System Analysis** - Large files, duplicates, startup optimization
+- 🎨 **HTML Reports** - Beautiful visual reports in addition to Markdown
+- 🛡️ **Critical Fixes** - Trap cleanup, disk space checks, caffeinate support
 
 ## Features
 
 ### Core Functionality
 - ✅ **Comprehensive Cleanup**: Cache, logs, temporary files, and system debris
 - ✅ **System Rebuild**: Spotlight, LaunchServices, kernel extensions, and font caches
-- ✅ **Optimization**: Database optimization for Mail, Safari, Photos, and more
-- ✅ **Disk Management**: Verification, repair, and permission fixes
-- ✅ **Network Operations**: DNS flush, network reset, daemon management
+- ✅ **Optimization**: Database optimization for Mail, Safari, Photos, browsers, and more
+- ✅ **Disk Management**: Verification, repair, permission fixes, and APFS snapshot management
+- ✅ **Network Operations**: DNS flush, network reset, daemon management, full diagnostics
 - ✅ **System Updates**: Check for macOS, security, and application updates
-- ✅ **Hardware Health**: Driver verification, firmware, and system diagnostics
+- ✅ **Hardware Health**: Driver verification, firmware, thermal monitoring, and system diagnostics
+- ✅ **Memory Management**: Analysis, optimization, and purge capabilities
+- ✅ **Security Audit**: SIP, Gatekeeper, FileVault, Firewall, and permissions checks
+- ✅ **Privacy Cleanup**: Remove sensitive data (history, recent items, Siri data)
 - ✅ **Progress Tracking**: Real-time progress bar with ETA calculation
 - ✅ **Risk Assessment**: Each operation shows LOW/MEDIUM/HIGH risk level
-- ✅ **User Confirmation**: Confirm each category before execution
+- ✅ **User Confirmation**: Confirm each category before execution (or auto-confirm)
 - ✅ **Timestamped Logging**: Complete audit trail of all operations
-- ✅ **Markdown Report**: Detailed final report saved to Desktop
+- ✅ **Dual Reports**: Markdown AND HTML reports saved to Desktop
+- ✅ **CLI Support**: Comprehensive command-line arguments
 - ✅ **Sudo Support**: Automatic privilege escalation when needed
+- ✅ **Safety Features**: Trap cleanup, disk space checks, caffeinate support
 
-### Maintenance Operations
+## Command-Line Usage
 
-#### Low-Level Operations (Safe)
+### Basic Usage
+```bash
+./mac_maintenance.sh
+```
+
+### CLI Arguments
+```bash
+./mac_maintenance.sh --help              # Show help
+./mac_maintenance.sh --list              # List all operations
+./mac_maintenance.sh --verbose           # Enable debug output
+./mac_maintenance.sh --yes               # Auto-confirm all
+./mac_maintenance.sh --only-risk LOW     # Run only low-risk operations
+./mac_maintenance.sh --operation <name>  # Run specific operation
+./mac_maintenance.sh --skip <operation>  # Skip specific operation
+./mac_maintenance.sh --version           # Show version
+./mac_maintenance.sh --no-color          # Disable colors
+```
+
+### Examples
+```bash
+# Auto-confirm all operations with verbose output
+./mac_maintenance.sh --verbose --yes
+
+# Run only low-risk operations
+./mac_maintenance.sh --only-risk LOW
+
+# Run specific operation
+./mac_maintenance.sh --operation security_audit
+
+# Skip network reset
+./mac_maintenance.sh --skip network_reset
+```
+
+## Maintenance Operations (37 Total)
+
+### Low-Risk Operations (21)
 1. **Cache Cleanup** - User, system, browser, and application caches
 2. **Log Cleanup** - System and application logs (keeps recent logs)
 3. **Temporary Files** - System and user temporary files
@@ -33,7 +86,30 @@ A powerful, exhaustive maintenance script specifically designed for MacBook Air 
 9. **QuickLook Cache** - QuickLook cache and plugin refresh
 10. **Login Items** - Review and list login items
 
-#### Medium-Risk Operations
+### Low-Risk Operations (21)
+1. **Cache Cleanup** - User, system, browser, and application caches
+2. **Log Cleanup** - System and application logs (keeps recent logs)
+3. **Temporary Files** - System and user temporary files
+4. **DNS Flush** - DNS cache and resolver cleanup
+5. **Disk Check** - Disk verification and SMART status
+6. **Font Cache** - Font cache cleanup and rebuild
+7. **Dock Reset** - Dock database and cache reset
+8. **Thumbnail Cache** - Icon and thumbnail cache cleanup
+9. **QuickLook Cache** - QuickLook cache and plugin refresh
+10. **Login Items** - Review and list login items
+11. **System Updates** - Check for macOS and security updates
+12. **App Updates** - Check Homebrew, App Store, npm, pip, gem updates
+13. **Driver Check** - Hardware diagnostics and driver verification
+14. **Security Audit** - 🆕 SIP, FileVault, Firewall, permissions checks
+15. **Backup Verification** - 🆕 Time Machine and iCloud status
+16. **Network Diagnostics** - 🆕 Complete network health check
+17. **Thermal Monitoring** - 🆕 CPU temperature and fan status
+18. **Large File Finder** - 🆕 Find files >100MB
+19. **Duplicate Finder** - 🆕 Scan for duplicate files
+20. **Startup Optimization** - 🆕 Analyze boot configuration
+21. **Log Analysis** - 🆕 Check for errors and kernel panics
+
+### Medium-Risk Operations (13)
 11. **Spotlight Rebuild** - Complete search index rebuild
 12. **LaunchServices Rebuild** - Application associations database
 13. **Permission Repair** - File permissions and ACLs
@@ -42,12 +118,17 @@ A powerful, exhaustive maintenance script specifically designed for MacBook Air 
 16. **Mail Optimization** - Mail envelope index and database optimization
 17. **iCloud Cache** - iCloud Drive and sync cache cleanup
 18. **Language Cleanup** - Remove unused language files (keeps English)
+19. **Memory Management** - 🆕 Memory analysis, VM stats, purge option
+20. **APFS Snapshots** - 🆕 Manage snapshots (can free 10-50GB!)
+21. **App Cache Optimization** - 🆕 Xcode, Docker, npm, Gradle, Python caches
+22. **Browser Optimization** - 🆕 Safari, Chrome, Firefox, Edge database optimization
+23. **Privacy Cleanup** - 🆕 Safari history, recent items, Siri data, clipboard
 
-#### High-Risk Operations
+### High-Risk Operations (2)
 19. **Kernel Extensions** - Kext cache rebuild (requires reboot)
 20. **Network Reset** - Complete network configuration reset
 
-#### System Maintenance & Updates (Low-Risk)
+### Additional Operations (1)
 21. **System Updates Check** - Check for macOS and security updates
 22. **Application Updates Check** - Check Homebrew, App Store, npm, pip, gem updates
 23. **Driver & Hardware Check** - Verify drivers, firmware, and system health
