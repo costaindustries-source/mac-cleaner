@@ -4,9 +4,11 @@
 # macOS Comprehensive Maintenance Script
 # Target: MacBook Air 2016, macOS Monterey 12.7.6
 # Description: Exhaustive system maintenance with low-level operations
+# Version: 2.0.0
 ################################################################################
 
 set -euo pipefail
+IFS=$'\n\t'
 
 # Colors for output
 RED='\033[0;31m'
@@ -19,7 +21,7 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Configuration
-SCRIPT_VERSION="1.1.0"
+SCRIPT_VERSION="2.0.0"
 SCRIPT_NAME="macOS Maintenance Script"
 START_TIME=$(date +%s)
 LOG_FILE="/tmp/mac_maintenance_$(date +%Y%m%d_%H%M%S).log"
@@ -30,15 +32,19 @@ SPACE_FREED=0
 ERRORS=()
 WARNINGS=()
 SKIPPED_OPERATIONS=()
+FAILED_OPERATIONS=()
+VERBOSE=false
+AUTO_CONFIRM=false
+CAFFEINATE_PID=""
 
 # Operation categories with risk levels
 # Using a function instead of associative array for Bash 3.x compatibility
 get_risk_level() {
     case "$1" in
-        cache_cleanup|log_cleanup|temp_cleanup|disk_check|dns_flush|font_cache|dock_reset|thumbnail_cache|quicklook_cache|login_items|system_updates|app_updates|driver_check)
+        cache_cleanup|log_cleanup|temp_cleanup|disk_check|dns_flush|font_cache|dock_reset|thumbnail_cache|quicklook_cache|login_items|system_updates|app_updates|driver_check|security_audit|backup_verification|network_diagnostics|thermal_monitoring)
             echo "LOW"
             ;;
-        spotlight_rebuild|launchservices_rebuild|permission_repair|database_optimization|daemon_operations|mail_optimization|icloud_cache|language_cleanup)
+        spotlight_rebuild|launchservices_rebuild|permission_repair|database_optimization|daemon_operations|mail_optimization|icloud_cache|language_cleanup|memory_management|apfs_snapshots)
             echo "MEDIUM"
             ;;
         kext_rebuild|network_reset)
@@ -79,6 +85,74 @@ log_success() {
 log_info() {
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     echo -e "${BLUE}[$timestamp] INFO: $1${NC}" | tee -a "$LOG_FILE"
+}
+
+log_debug() {
+    if [[ "$VERBOSE" == "true" ]]; then
+        local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+        echo -e "${MAGENTA}[$timestamp] DEBUG: $1${NC}" | tee -a "$LOG_FILE"
+    fi
+}
+
+################################################################################
+# Cleanup and Safety Functions
+################################################################################
+
+cleanup() {
+    local exit_code=$?
+    
+    log_debug "Cleanup function called with exit code: $exit_code"
+    
+    # Stop caffeinate if running
+    if [[ -n "$CAFFEINATE_PID" ]] && kill -0 "$CAFFEINATE_PID" 2>/dev/null; then
+        log_debug "Stopping caffeinate process (PID: $CAFFEINATE_PID)"
+        kill "$CAFFEINATE_PID" 2>/dev/null || true
+    fi
+    
+    # Cleanup any temporary files created by script
+    # (Currently all temps go to /tmp which is auto-cleaned)
+    
+    if [[ $exit_code -ne 0 ]]; then
+        log_error "Script exited with error code: $exit_code"
+    else
+        log_debug "Script cleanup completed successfully"
+    fi
+    
+    return $exit_code
+}
+
+# Set trap for cleanup on exit, error, interrupt, or termination
+trap cleanup EXIT ERR INT TERM
+
+check_disk_space() {
+    local required_gb=5
+    log_info "Checking available disk space..."
+    
+    # Get available space in GB
+    local available=$(df -g / | tail -1 | awk '{print $4}')
+    
+    log_debug "Available disk space: ${available}GB, Required: ${required_gb}GB"
+    
+    if [[ $available -lt $required_gb ]]; then
+        log_error "Insufficient disk space: ${available}GB available, ${required_gb}GB required"
+        log_error "Please free up disk space before running maintenance"
+        return 1
+    fi
+    
+    log_success "Sufficient disk space available: ${available}GB"
+    return 0
+}
+
+start_caffeinate() {
+    # Prevent system sleep during maintenance
+    if command -v caffeinate &> /dev/null; then
+        log_debug "Starting caffeinate to prevent system sleep"
+        caffeinate -dims -w $$ &
+        CAFFEINATE_PID=$!
+        log_debug "Caffeinate started with PID: $CAFFEINATE_PID"
+    else
+        log_warning "caffeinate command not available"
+    fi
 }
 
 ################################################################################
@@ -126,6 +200,12 @@ confirm_operation() {
     local category=$1
     local description=$2
     local risk=$(get_risk_level "$category")
+    
+    # Auto-confirm if flag is set
+    if [[ "$AUTO_CONFIRM" == "true" ]]; then
+        log_debug "Auto-confirming operation: $category"
+        return 0
+    fi
     
     echo ""
     echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -1266,6 +1346,372 @@ additional_optimizations() {
     log_success "Additional optimizations completed"
 }
 
+# 25. Memory Management
+manage_memory() {
+    if ! confirm_operation "memory_management" "Analyze and optimize memory usage"; then
+        return
+    fi
+    
+    log_info "Starting memory management..."
+    local ops=0
+    local total_ops=5
+    
+    # Check memory pressure
+    show_progress $((++ops)) $total_ops "Analyzing memory pressure"
+    log_info "Memory pressure analysis:"
+    if command -v memory_pressure &> /dev/null; then
+        memory_pressure 2>&1 | head -10 | tee -a "$LOG_FILE"
+    fi
+    
+    # Get memory statistics
+    show_progress $((++ops)) $total_ops "Collecting memory statistics"
+    vm_stat | head -20 | tee -a "$LOG_FILE"
+    
+    # Check swap usage
+    show_progress $((++ops)) $total_ops "Checking swap usage"
+    sysctl vm.swapusage 2>&1 | tee -a "$LOG_FILE"
+    
+    # Top memory consumers
+    show_progress $((++ops)) $total_ops "Identifying top memory consumers"
+    log_info "Top 10 memory consumers:"
+    ps aux | sort -rk 4 | head -11 | tee -a "$LOG_FILE"
+    
+    # Purge inactive memory
+    show_progress $((++ops)) $total_ops "Purging inactive memory"
+    read -p "Purge inactive memory to free RAM? [y/N] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Purging memory..."
+        sudo purge
+        log_success "Memory purged successfully"
+    else
+        log_info "Memory purge skipped"
+    fi
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "Memory management completed"
+}
+
+# 26. APFS Snapshot Management
+manage_apfs_snapshots() {
+    if ! confirm_operation "apfs_snapshots" "Manage APFS snapshots (can free significant space)"; then
+        return
+    fi
+    
+    log_info "Starting APFS snapshot management..."
+    local ops=0
+    local total_ops=4
+    
+    # List all snapshots
+    show_progress $((++ops)) $total_ops "Listing APFS snapshots"
+    log_info "Local Time Machine snapshots:"
+    tmutil listlocalsnapshots / 2>&1 | tee -a "$LOG_FILE"
+    
+    # Count snapshots
+    show_progress $((++ops)) $total_ops "Analyzing snapshot disk usage"
+    local snapshot_count=$(tmutil listlocalsnapshots / 2>&1 | grep "com.apple" | wc -l | tr -d ' ')
+    log_info "Found $snapshot_count local snapshots"
+    
+    if [[ $snapshot_count -gt 0 ]]; then
+        # Show current disk usage
+        show_progress $((++ops)) $total_ops "Checking disk usage"
+        df -h / | tee -a "$LOG_FILE"
+        
+        log_warning "Deleting snapshots will free disk space but removes backup points"
+        read -p "Delete all local Time Machine snapshots? [y/N] " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            show_progress $((++ops)) $total_ops "Deleting snapshots"
+            local space_before=$(df -k / | tail -1 | awk '{print $3}')
+            
+            tmutil listlocalsnapshots / 2>&1 | grep "com.apple" | while read -r snapshot; do
+                local snap_date=$(echo "$snapshot" | sed 's/com.apple.TimeMachine.//')
+                log_info "Deleting snapshot: $snap_date"
+                sudo tmutil deletelocalsnapshots "$snap_date" 2>&1 | tee -a "$LOG_FILE"
+            done
+            
+            local space_after=$(df -k / | tail -1 | awk '{print $3}')
+            local freed=$((space_before - space_after))
+            if [[ $freed -gt 0 ]]; then
+                SPACE_FREED=$((SPACE_FREED + freed))
+                log_success "Freed $(numfmt --to=iec-i --suffix=B $((freed * 1024))) from snapshots"
+            fi
+        else
+            log_info "Snapshot deletion skipped"
+        fi
+    else
+        show_progress $((++ops)) $total_ops "No snapshots to delete"
+        log_info "No local snapshots found"
+    fi
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "APFS snapshot management completed"
+}
+
+# 27. Security Audit
+perform_security_audit() {
+    if ! confirm_operation "security_audit" "Comprehensive security audit"; then
+        return
+    fi
+    
+    log_info "Starting security audit..."
+    local ops=0
+    local total_ops=10
+    
+    # Check SIP status
+    show_progress $((++ops)) $total_ops "Checking System Integrity Protection"
+    log_info "System Integrity Protection status:"
+    csrutil status 2>&1 | tee -a "$LOG_FILE"
+    
+    # Check Gatekeeper
+    show_progress $((++ops)) $total_ops "Checking Gatekeeper"
+    log_info "Gatekeeper status:"
+    spctl --status 2>&1 | tee -a "$LOG_FILE"
+    
+    # Check FileVault
+    show_progress $((++ops)) $total_ops "Checking FileVault encryption"
+    log_info "FileVault status:"
+    fdesetup status 2>&1 | tee -a "$LOG_FILE"
+    
+    if ! fdesetup status 2>&1 | grep -q "FileVault is On"; then
+        log_warning "⚠️ FileVault is OFF - your disk is not encrypted!"
+        log_warning "Enable in System Preferences → Security & Privacy → FileVault"
+    else
+        log_success "✓ FileVault is enabled"
+    fi
+    
+    # Check Firewall
+    show_progress $((++ops)) $total_ops "Checking firewall"
+    log_info "Firewall status:"
+    sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>&1 | tee -a "$LOG_FILE"
+    
+    # Check for unsigned applications
+    show_progress $((++ops)) $total_ops "Checking for unsigned applications"
+    log_info "Scanning /Applications for unsigned apps (this may take a moment)..."
+    local unsigned_count=0
+    find /Applications -name "*.app" -maxdepth 2 2>/dev/null | while read -r app; do
+        if ! codesign -v "$app" 2>/dev/null; then
+            log_warning "Unsigned application: $(basename "$app")"
+            unsigned_count=$((unsigned_count + 1))
+        fi
+    done
+    
+    # Check SSH configuration
+    show_progress $((++ops)) $total_ops "Checking SSH configuration"
+    if [[ -d "$HOME/.ssh" ]]; then
+        log_info "SSH directory exists"
+        local ssh_perms=$(stat -f%A "$HOME/.ssh" 2>/dev/null)
+        if [[ "$ssh_perms" != "700" ]]; then
+            log_warning "⚠️ .ssh directory has insecure permissions ($ssh_perms)!"
+            log_info "Fix with: chmod 700 ~/.ssh"
+        else
+            log_success "✓ SSH directory permissions are secure"
+        fi
+    fi
+    
+    # Check for world-writable files in home
+    show_progress $((++ops)) $total_ops "Checking for insecure file permissions"
+    log_info "Checking for world-writable files in home directory..."
+    local writable=$(find "$HOME" -type f -perm -002 2>/dev/null | head -10)
+    if [[ -n "$writable" ]]; then
+        log_warning "Found world-writable files:"
+        echo "$writable" | tee -a "$LOG_FILE"
+        log_warning "Consider fixing with: chmod 644 <file>"
+    else
+        log_success "✓ No world-writable files found in home directory"
+    fi
+    
+    # Check sudo configuration
+    show_progress $((++ops)) $total_ops "Checking sudo timeout"
+    local sudo_timeout=$(sudo -V 2>&1 | grep "Authentication timestamp timeout" | awk '{print $4}')
+    if [[ -n "$sudo_timeout" ]]; then
+        log_info "Sudo timeout: $sudo_timeout minutes"
+    fi
+    
+    # Check automatic updates
+    show_progress $((++ops)) $total_ops "Checking automatic updates"
+    local auto_check=$(defaults read /Library/Preferences/com.apple.SoftwareUpdate AutomaticCheckEnabled 2>/dev/null)
+    if [[ "$auto_check" == "1" ]]; then
+        log_success "✓ Automatic update check is enabled"
+    else
+        log_warning "⚠️ Automatic update check is disabled"
+    fi
+    
+    # Summary
+    show_progress $((++ops)) $total_ops "Generating security summary"
+    log_info "Security audit completed - review warnings above"
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "Security audit completed"
+}
+
+# 28. Backup Verification
+verify_backups() {
+    if ! confirm_operation "backup_verification" "Verify Time Machine and backup configuration"; then
+        return
+    fi
+    
+    log_info "Starting backup verification..."
+    local ops=0
+    local total_ops=6
+    
+    # Time Machine status
+    show_progress $((++ops)) $total_ops "Checking Time Machine status"
+    log_info "Time Machine status:"
+    tmutil status 2>&1 | tee -a "$LOG_FILE"
+    
+    # Last backup date
+    show_progress $((++ops)) $total_ops "Checking last backup"
+    log_info "Last Time Machine backup:"
+    local last_backup=$(tmutil latestbackup 2>&1)
+    if [[ -n "$last_backup" ]] && [[ "$last_backup" != *"No machine directory"* ]]; then
+        echo "$last_backup" | tee -a "$LOG_FILE"
+        log_success "✓ Time Machine backup found"
+    else
+        log_error "✗ No Time Machine backups found!"
+        log_warning "Configure Time Machine in System Preferences"
+    fi
+    
+    # Backup destinations
+    show_progress $((++ops)) $total_ops "Checking backup destinations"
+    log_info "Time Machine destinations:"
+    tmutil destinationinfo 2>&1 | tee -a "$LOG_FILE"
+    
+    # Check if Time Machine is enabled
+    show_progress $((++ops)) $total_ops "Verifying Time Machine is enabled"
+    if tmutil status 2>&1 | grep -q "Running = 1"; then
+        log_success "✓ Time Machine is currently running"
+    else
+        log_info "Time Machine is not currently running"
+    fi
+    
+    # List local snapshots
+    show_progress $((++ops)) $total_ops "Listing local snapshots"
+    log_info "Local Time Machine snapshots:"
+    local snap_count=$(tmutil listlocalsnapshots / 2>&1 | grep "com.apple" | wc -l | tr -d ' ')
+    log_info "Found $snap_count local snapshots"
+    
+    # Check iCloud sync status
+    show_progress $((++ops)) $total_ops "Checking iCloud sync"
+    log_info "iCloud sync status:"
+    if command -v brctl &> /dev/null; then
+        brctl status 2>&1 | head -20 | tee -a "$LOG_FILE"
+    else
+        log_info "brctl not available on this macOS version"
+    fi
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "Backup verification completed"
+}
+
+# 29. Network Diagnostics
+perform_network_diagnostics() {
+    if ! confirm_operation "network_diagnostics" "Comprehensive network diagnostics"; then
+        return
+    fi
+    
+    log_info "Starting network diagnostics..."
+    local ops=0
+    local total_ops=8
+    
+    # Current network interfaces
+    show_progress $((++ops)) $total_ops "Checking network interfaces"
+    log_info "Active network interfaces:"
+    ifconfig | grep -A 4 "^en" | tee -a "$LOG_FILE"
+    
+    # DNS servers
+    show_progress $((++ops)) $total_ops "Checking DNS configuration"
+    log_info "Current DNS servers:"
+    scutil --dns 2>&1 | grep "nameserver" | head -10 | tee -a "$LOG_FILE"
+    
+    # Network routes
+    show_progress $((++ops)) $total_ops "Checking network routes"
+    log_info "Network routing table:"
+    netstat -rn | head -20 | tee -a "$LOG_FILE"
+    
+    # Test connectivity
+    show_progress $((++ops)) $total_ops "Testing internet connectivity"
+    log_info "Testing internet connectivity..."
+    
+    if ping -c 3 -t 5 8.8.8.8 &> /dev/null; then
+        log_success "✓ Internet connectivity: OK"
+    else
+        log_error "✗ Internet connectivity: FAILED"
+    fi
+    
+    show_progress $((++ops)) $total_ops "Testing DNS resolution"
+    if ping -c 3 -t 5 google.com &> /dev/null; then
+        log_success "✓ DNS resolution: OK"
+    else
+        log_error "✗ DNS resolution: FAILED"
+    fi
+    
+    # Wi-Fi diagnostics
+    show_progress $((++ops)) $total_ops "Checking Wi-Fi information"
+    log_info "Wi-Fi information:"
+    if [[ -f /System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport ]]; then
+        /System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -I 2>&1 | tee -a "$LOG_FILE"
+    fi
+    
+    # VPN status
+    show_progress $((++ops)) $total_ops "Checking VPN configuration"
+    log_info "VPN configurations:"
+    scutil --nc list 2>&1 | tee -a "$LOG_FILE"
+    
+    # Proxy settings
+    show_progress $((++ops)) $total_ops "Checking proxy settings"
+    log_info "Proxy settings:"
+    networksetup -getwebproxy Wi-Fi 2>&1 | tee -a "$LOG_FILE"
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "Network diagnostics completed"
+}
+
+# 30. Thermal Monitoring
+monitor_thermal_status() {
+    if ! confirm_operation "thermal_monitoring" "Monitor system temperature and thermal status"; then
+        return
+    fi
+    
+    log_info "Starting thermal monitoring..."
+    local ops=0
+    local total_ops=4
+    
+    # Check if osx-cpu-temp is available
+    show_progress $((++ops)) $total_ops "Checking CPU temperature"
+    if command -v osx-cpu-temp &> /dev/null; then
+        log_info "CPU Temperature:"
+        osx-cpu-temp 2>&1 | tee -a "$LOG_FILE"
+    else
+        log_info "osx-cpu-temp not installed"
+        log_info "Install with: brew install osx-cpu-temp"
+    fi
+    
+    # Check fan speed and thermal pressure
+    show_progress $((++ops)) $total_ops "Checking fan and thermal status"
+    log_info "System thermal status:"
+    sudo powermetrics --samplers smc -i 1 -n 1 2>&1 | grep -i "fan\|thermal" | head -10 | tee -a "$LOG_FILE"
+    
+    # CPU usage
+    show_progress $((++ops)) $total_ops "Checking CPU usage"
+    log_info "CPU usage:"
+    top -l 1 | grep "CPU usage" | tee -a "$LOG_FILE"
+    
+    # Check for throttling
+    show_progress $((++ops)) $total_ops "Checking CPU frequency"
+    log_info "CPU frequency:"
+    sysctl hw.cpufrequency hw.cpufrequency_max 2>&1 | tee -a "$LOG_FILE"
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "Thermal monitoring completed"
+}
+
 ################################################################################
 # Report Generation
 ################################################################################
@@ -1448,6 +1894,7 @@ main() {
     echo "╔════════════════════════════════════════════════════════════════════════╗"
     echo "║                                                                        ║"
     echo "║              macOS COMPREHENSIVE MAINTENANCE SCRIPT                    ║"
+    echo "║                          VERSION 2.0.0                                 ║"
     echo "║                                                                        ║"
     echo "║                   MacBook Air 2016 - macOS Monterey                    ║"
     echo "║                                                                        ║"
@@ -1458,6 +1905,18 @@ main() {
     log_info "Log file: $LOG_FILE"
     log_info "Report will be saved to: $REPORT_FILE"
     
+    # Critical pre-flight checks
+    log_info "Performing pre-flight checks..."
+    
+    # Check disk space
+    if ! check_disk_space; then
+        log_error "Pre-flight check failed: insufficient disk space"
+        exit 1
+    fi
+    
+    # Start caffeinate to prevent sleep
+    start_caffeinate
+    
     # Check for sudo
     check_sudo
     
@@ -1467,8 +1926,8 @@ main() {
     sw_vers | tee -a "$LOG_FILE"
     echo ""
     
-    # Count total operations
-    TOTAL_OPERATIONS=23
+    # Count total operations (updated to include new operations)
+    TOTAL_OPERATIONS=29
     
     echo -e "${YELLOW}${BOLD}"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -1489,10 +1948,16 @@ main() {
     check_system_updates
     check_app_updates
     
+    # NEW: Critical operations first
+    verify_backups
+    manage_memory
+    perform_security_audit
+    
     # Regular maintenance operations
     cleanup_caches
     cleanup_logs
     cleanup_temp
+    manage_apfs_snapshots
     rebuild_spotlight
     rebuild_launchservices
     check_disk
@@ -1511,6 +1976,10 @@ main() {
     check_login_items
     check_drivers_hardware
     additional_optimizations
+    
+    # NEW: Additional diagnostics
+    perform_network_diagnostics
+    monitor_thermal_status
     
     # Network reset should be last among network operations
     reset_network
