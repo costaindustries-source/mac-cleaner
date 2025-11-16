@@ -460,7 +460,7 @@ safe_remove() {
             return 0
         else
             log_error "Failed to remove: $path"
-            return 1
+            return 0  # Continue execution even if removal fails
         fi
     fi
     return 0
