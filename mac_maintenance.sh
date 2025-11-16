@@ -41,10 +41,10 @@ CAFFEINATE_PID=""
 # Using a function instead of associative array for Bash 3.x compatibility
 get_risk_level() {
     case "$1" in
-        cache_cleanup|log_cleanup|temp_cleanup|disk_check|dns_flush|font_cache|dock_reset|thumbnail_cache|quicklook_cache|login_items|system_updates|app_updates|driver_check|security_audit|backup_verification|network_diagnostics|thermal_monitoring)
+        cache_cleanup|log_cleanup|temp_cleanup|disk_check|dns_flush|font_cache|dock_reset|thumbnail_cache|quicklook_cache|login_items|system_updates|app_updates|driver_check|security_audit|backup_verification|network_diagnostics|thermal_monitoring|large_file_finder|duplicate_finder|startup_optimization|log_analysis)
             echo "LOW"
             ;;
-        spotlight_rebuild|launchservices_rebuild|permission_repair|database_optimization|daemon_operations|mail_optimization|icloud_cache|language_cleanup|memory_management|apfs_snapshots)
+        spotlight_rebuild|launchservices_rebuild|permission_repair|database_optimization|daemon_operations|mail_optimization|icloud_cache|language_cleanup|memory_management|apfs_snapshots|app_cache_optimization|browser_optimization|privacy_cleanup)
             echo "MEDIUM"
             ;;
         kext_rebuild|network_reset)
@@ -1712,6 +1712,351 @@ monitor_thermal_status() {
     log_success "Thermal monitoring completed"
 }
 
+# 31. Large File Finder
+find_large_files() {
+    if ! confirm_operation "large_file_finder" "Find large files consuming disk space"; then
+        return
+    fi
+    
+    log_info "Searching for large files..."
+    local ops=0
+    local total_ops=2
+    
+    show_progress $((++ops)) $total_ops "Scanning for files larger than 100MB"
+    echo "Top 50 largest files on the system:" | tee -a "$LOG_FILE"
+    
+    # Find files larger than 100MB, excluding system and backup locations
+    show_progress $((++ops)) $total_ops "Generating report"
+    sudo find / -type f -size +100M \
+        -not -path "*/Library/Application Support/MobileSync/Backup/*" \
+        -not -path "*/Backups.backupdb/*" \
+        -not -path "*/System/*" \
+        -not -path "*/private/var/db/*" \
+        -not -path "*/.Spotlight-V100/*" \
+        -not -path "*/.fseventsd/*" \
+        -exec du -h {} \; 2>/dev/null | \
+        sort -rh | head -50 | tee -a "$LOG_FILE"
+    
+    log_info "Review and delete large unnecessary files manually"
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "Large file finder completed"
+}
+
+# 32. Duplicate File Finder
+find_duplicate_files() {
+    if ! confirm_operation "duplicate_finder" "Scan for duplicate files (read-only analysis)"; then
+        return
+    fi
+    
+    log_info "Scanning for duplicate files (this may take several minutes)..."
+    local ops=0
+    local total_ops=3
+    
+    show_progress $((++ops)) $total_ops "Preparing scan"
+    local temp_report="/tmp/duplicates_$(date +%Y%m%d_%H%M%S).txt"
+    
+    # Find duplicates by size and hash in common locations
+    show_progress $((++ops)) $total_ops "Scanning common locations"
+    find "$HOME/Downloads" "$HOME/Documents" "$HOME/Desktop" -type f -size +1M 2>/dev/null | \
+        while read -r file; do
+            if [[ -f "$file" ]]; then
+                local hash=$(md5 -q "$file" 2>/dev/null)
+                local size=$(stat -f%z "$file" 2>/dev/null)
+                echo "${hash}|${size}|${file}"
+            fi
+        done | sort | uniq -w 32 -d > "$temp_report"
+    
+    show_progress $((++ops)) $total_ops "Analyzing results"
+    local dup_count=$(wc -l < "$temp_report" | tr -d ' ')
+    
+    if [[ $dup_count -gt 0 ]]; then
+        log_warning "Found $dup_count potential duplicate files"
+        log_info "Report saved to: $temp_report"
+        cat "$temp_report" | tee -a "$LOG_FILE"
+        log_info "Review and manually delete duplicates if needed"
+    else
+        log_success "No duplicate files found"
+        rm "$temp_report"
+    fi
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "Duplicate file finder completed"
+}
+
+# 33. Startup Optimization
+optimize_startup() {
+    if ! confirm_operation "startup_optimization" "Optimize system startup and boot time"; then
+        return
+    fi
+    
+    log_info "Analyzing startup configuration..."
+    local ops=0
+    local total_ops=6
+    
+    # List user LaunchAgents
+    show_progress $((++ops)) $total_ops "Listing user LaunchAgents"
+    log_info "User LaunchAgents:"
+    ls -la "$HOME/Library/LaunchAgents/" 2>&1 | tee -a "$LOG_FILE"
+    
+    # List system LaunchAgents
+    show_progress $((++ops)) $total_ops "Listing system LaunchAgents"
+    log_info "System LaunchAgents:"
+    sudo ls -la /Library/LaunchAgents/ 2>&1 | tee -a "$LOG_FILE"
+    
+    # List system LaunchDaemons
+    show_progress $((++ops)) $total_ops "Listing system LaunchDaemons"
+    log_info "System LaunchDaemons:"
+    sudo ls -la /Library/LaunchDaemons/ 2>&1 | tee -a "$LOG_FILE"
+    
+    # Show currently loaded user agents
+    show_progress $((++ops)) $total_ops "Checking loaded user agents"
+    log_info "Currently loaded user agents (non-Apple):"
+    launchctl list | grep -v "com.apple" | tee -a "$LOG_FILE"
+    
+    # Boot time analysis
+    show_progress $((++ops)) $total_ops "Analyzing boot time"
+    log_info "Last boot time:"
+    sysctl kern.boottime | tee -a "$LOG_FILE"
+    
+    log_info "System uptime:"
+    uptime | tee -a "$LOG_FILE"
+    
+    # Recommendations
+    show_progress $((++ops)) $total_ops "Generating recommendations"
+    log_warning "Review the list above and disable unnecessary services manually"
+    log_info "To disable a service: launchctl unload <path-to-plist>"
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "Startup optimization analysis completed"
+}
+
+# 34. Application Cache Optimization
+optimize_app_caches() {
+    if ! confirm_operation "app_cache_optimization" "Optimize application-specific caches and settings"; then
+        return
+    fi
+    
+    log_info "Optimizing application caches..."
+    local ops=0
+    local total_ops=8
+    
+    # Xcode derived data
+    show_progress $((++ops)) $total_ops "Checking Xcode caches"
+    if [[ -d "$HOME/Library/Developer/Xcode/DerivedData" ]]; then
+        local xcode_size=$(du -sh "$HOME/Library/Developer/Xcode/DerivedData" 2>/dev/null | awk '{print $1}')
+        log_info "Xcode DerivedData size: $xcode_size"
+        safe_remove "$HOME/Library/Developer/Xcode/DerivedData/*"
+    fi
+    
+    # Docker cleanup
+    show_progress $((++ops)) $total_ops "Checking Docker"
+    if command -v docker &> /dev/null; then
+        log_info "Cleaning Docker caches..."
+        docker system prune -af --volumes 2>&1 | tee -a "$LOG_FILE"
+    fi
+    
+    # Gradle cache
+    show_progress $((++ops)) $total_ops "Checking Gradle cache"
+    if [[ -d "$HOME/.gradle/caches" ]]; then
+        local gradle_size=$(du -sh "$HOME/.gradle/caches" 2>/dev/null | awk '{print $1}')
+        log_info "Gradle cache size: $gradle_size"
+        safe_remove "$HOME/.gradle/caches/*"
+    fi
+    
+    # Node modules global cache
+    show_progress $((++ops)) $total_ops "Checking npm cache"
+    if [[ -d "$HOME/.npm" ]]; then
+        local npm_size=$(du -sh "$HOME/.npm" 2>/dev/null | awk '{print $1}')
+        log_info "npm cache size: $npm_size"
+        if command -v npm &> /dev/null; then
+            npm cache clean --force 2>&1 | tee -a "$LOG_FILE"
+        fi
+    fi
+    
+    # Yarn cache
+    show_progress $((++ops)) $total_ops "Checking Yarn cache"
+    if command -v yarn &> /dev/null; then
+        log_info "Cleaning Yarn cache..."
+        yarn cache clean 2>&1 | tee -a "$LOG_FILE"
+    fi
+    
+    # Python __pycache__
+    show_progress $((++ops)) $total_ops "Cleaning Python cache files"
+    log_info "Removing Python cache files..."
+    find "$HOME" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
+    find "$HOME" -type f -name "*.pyc" -delete 2>/dev/null
+    find "$HOME" -type f -name "*.pyo" -delete 2>/dev/null
+    
+    # Go cache
+    show_progress $((++ops)) $total_ops "Checking Go cache"
+    if command -v go &> /dev/null; then
+        log_info "Cleaning Go cache..."
+        go clean -cache 2>&1 | tee -a "$LOG_FILE"
+    fi
+    
+    # Rust cache
+    show_progress $((++ops)) $total_ops "Checking Rust cache"
+    if [[ -d "$HOME/.cargo" ]]; then
+        log_info "Rust/Cargo cache found (not cleaning - may be needed)"
+    fi
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "Application cache optimization completed"
+}
+
+# 35. Browser Optimization
+optimize_browsers() {
+    if ! confirm_operation "browser_optimization" "Optimize browser profiles and databases"; then
+        return
+    fi
+    
+    log_info "Optimizing browser profiles..."
+    local ops=0
+    local total_ops=4
+    
+    # Safari profile
+    show_progress $((++ops)) $total_ops "Optimizing Safari"
+    if [[ -f "$HOME/Library/Safari/History.db" ]]; then
+        safe_remove "$HOME/Library/Safari/History.db-shm"
+        safe_remove "$HOME/Library/Safari/History.db-wal"
+        sqlite3 "$HOME/Library/Safari/History.db" "VACUUM;" 2>/dev/null
+        sqlite3 "$HOME/Library/Safari/History.db" "REINDEX;" 2>/dev/null
+        log_success "Safari database optimized"
+    fi
+    
+    # Chrome profiles
+    show_progress $((++ops)) $total_ops "Optimizing Chrome"
+    if [[ -d "$HOME/Library/Application Support/Google/Chrome" ]]; then
+        log_info "Chrome profile optimization:"
+        find "$HOME/Library/Application Support/Google/Chrome" -name "History" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
+        find "$HOME/Library/Application Support/Google/Chrome" -name "Cookies" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
+        log_success "Chrome databases optimized"
+    fi
+    
+    # Firefox profiles
+    show_progress $((++ops)) $total_ops "Optimizing Firefox"
+    if [[ -d "$HOME/Library/Application Support/Firefox" ]]; then
+        log_info "Firefox profile optimization:"
+        find "$HOME/Library/Application Support/Firefox" -name "places.sqlite" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
+        find "$HOME/Library/Application Support/Firefox" -name "cookies.sqlite" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
+        log_success "Firefox databases optimized"
+    fi
+    
+    # Edge
+    show_progress $((++ops)) $total_ops "Optimizing Edge"
+    if [[ -d "$HOME/Library/Application Support/Microsoft Edge" ]]; then
+        log_info "Edge profile optimization:"
+        find "$HOME/Library/Application Support/Microsoft Edge" -name "History" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
+        log_success "Edge databases optimized"
+    fi
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "Browser optimization completed"
+}
+
+# 36. Privacy Data Cleanup
+cleanup_privacy_data() {
+    if ! confirm_operation "privacy_cleanup" "Clean privacy-sensitive data (cookies, history, etc.)"; then
+        return
+    fi
+    
+    log_info "Cleaning privacy-sensitive data..."
+    local ops=0
+    local total_ops=6
+    
+    # Safari history and cookies
+    show_progress $((++ops)) $total_ops "Safari privacy data"
+    read -p "Clear Safari browsing history? [y/N] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        safe_remove "$HOME/Library/Safari/History.db"
+        safe_remove "$HOME/Library/Safari/History.db-shm"
+        safe_remove "$HOME/Library/Safari/History.db-wal"
+        log_success "Safari history cleared"
+    fi
+    
+    # Recent items
+    show_progress $((++ops)) $total_ops "Recent items"
+    safe_remove "$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/*"
+    safe_remove "$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.RecentApplications.sfl*"
+    safe_remove "$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.RecentDocuments.sfl*"
+    safe_remove "$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.RecentServers.sfl*"
+    
+    # Siri data
+    show_progress $((++ops)) $total_ops "Siri data"
+    safe_remove "$HOME/Library/Assistant/SiriAnalytics.db"
+    
+    # Quick Look recent items
+    show_progress $((++ops)) $total_ops "Quick Look recent items"
+    safe_remove "$HOME/Library/Application Support/Quick Look/*"
+    
+    # Spotlight suggestions
+    show_progress $((++ops)) $total_ops "Spotlight suggestions"
+    safe_remove "$HOME/Library/Safari/RecentSearches.plist"
+    
+    # Clear clipboard
+    show_progress $((++ops)) $total_ops "Clipboard"
+    read -p "Clear clipboard? [y/N] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        pbcopy < /dev/null
+        log_success "Clipboard cleared"
+    fi
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "Privacy data cleanup completed"
+}
+
+# 37. System Log Analysis
+analyze_system_logs() {
+    if ! confirm_operation "log_analysis" "Analyze system logs for errors and warnings"; then
+        return
+    fi
+    
+    log_info "Analyzing system logs..."
+    local ops=0
+    local total_ops=4
+    
+    # Recent system errors
+    show_progress $((++ops)) $total_ops "Checking for recent errors"
+    log_info "Recent system errors (last 1 hour):"
+    log show --predicate 'eventMessage contains "error" OR eventMessage contains "fail"' \
+        --info --last 1h 2>/dev/null | tail -100 | tee -a "$LOG_FILE"
+    
+    # Kernel panics
+    show_progress $((++ops)) $total_ops "Checking for kernel panics"
+    log_info "Checking for kernel panics:"
+    if ls /Library/Logs/DiagnosticReports/Kernel_*.panic 2>/dev/null; then
+        log_warning "⚠️ Kernel panics detected!"
+        ls -lt /Library/Logs/DiagnosticReports/Kernel_*.panic | tee -a "$LOG_FILE"
+    else
+        log_success "✓ No kernel panics found"
+    fi
+    
+    # Application crashes
+    show_progress $((++ops)) $total_ops "Checking for application crashes"
+    log_info "Recent application crashes (last 7 days):"
+    find "$HOME/Library/Logs/DiagnosticReports" -name "*.crash" -mtime -7 -exec basename {} \; 2>/dev/null | \
+        sort | uniq -c | sort -rn | head -10 | tee -a "$LOG_FILE"
+    
+    # Disk errors
+    show_progress $((++ops)) $total_ops "Checking for disk errors"
+    log_info "Checking for disk errors:"
+    log show --predicate 'processImagePath contains "diskmanagementd" OR processImagePath contains "fsck"' \
+        --info --last 24h 2>/dev/null | grep -i "error\|fail" | tail -20 | tee -a "$LOG_FILE"
+    
+    complete_progress
+    COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
+    log_success "System log analysis completed"
+}
+
 ################################################################################
 # Report Generation
 ################################################################################
@@ -1927,7 +2272,7 @@ main() {
     echo ""
     
     # Count total operations (updated to include new operations)
-    TOTAL_OPERATIONS=29
+    TOTAL_OPERATIONS=37
     
     echo -e "${YELLOW}${BOLD}"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -1976,6 +2321,15 @@ main() {
     check_login_items
     check_drivers_hardware
     additional_optimizations
+    
+    # NEW: Additional high-priority operations
+    find_large_files
+    find_duplicate_files
+    optimize_startup
+    optimize_app_caches
+    optimize_browsers
+    cleanup_privacy_data
+    analyze_system_logs
     
     # NEW: Additional diagnostics
     perform_network_diagnostics
