@@ -5,7 +5,7 @@
 # For format details, see: https://gh.io/customagents/config
 
 name: macOS Bash Script Expert
-description:
+description: Expert MacOS bash script developer
 ---
 
 # My Agent
