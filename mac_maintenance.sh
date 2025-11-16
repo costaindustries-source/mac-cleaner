@@ -173,9 +173,9 @@ show_progress() {
     local eta_sec=0
     
     if [ "$elapsed" -gt 0 ] && [ "$current" -gt 0 ]; then
-        local rate=$(awk "BEGIN {printf \"%.4f\", $current / $elapsed}")
+        local rate=$(awk -v curr="$current" -v elap="$elapsed" 'BEGIN {printf "%.4f", curr / elap}')
         local remaining=$((total - current))
-        local eta=$(awk "BEGIN {if ($rate > 0) print int($remaining / $rate); else print 0}")
+        local eta=$(awk -v r="$rate" -v rem="$remaining" 'BEGIN {if (r > 0) print int(rem / r); else print 0}')
         eta_min=$((eta / 60))
         eta_sec=$((eta % 60))
     fi
