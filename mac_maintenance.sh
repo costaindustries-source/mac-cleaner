@@ -856,8 +856,8 @@ optimize_databases() {
     # Application Support databases
     show_progress $((++ops)) $total_ops "Optimizing Application Support databases"
     find "$HOME/Library/Application Support" -name "*.db" -o -name "*.sqlite" | while read db; do
-        sqlite3 "$db" "VACUUM;" 2>/dev/null
-        sqlite3 "$db" "REINDEX;" 2>/dev/null
+        sqlite3 "$db" "VACUUM;" 2>/dev/null || true
+        sqlite3 "$db" "REINDEX;" 2>/dev/null || true
     done
     
     complete_progress
@@ -1512,7 +1512,7 @@ additional_optimizations() {
     
     # Clear quarantine flags
     show_progress $((++ops)) $total_ops "Clearing download quarantine database"
-    sqlite3 "$HOME/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2" "DELETE FROM LSQuarantineEvent;" 2>/dev/null
+    sqlite3 "$HOME/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2" "DELETE FROM LSQuarantineEvent;" 2>/dev/null || true
     
     # Rebuild dyld cache
     show_progress $((++ops)) $total_ops "Updating dynamic linker cache"
@@ -2082,9 +2082,9 @@ optimize_app_caches() {
     # Python __pycache__
     show_progress $((++ops)) $total_ops "Cleaning Python cache files"
     log_info "Removing Python cache files..."
-    find "$HOME" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
-    find "$HOME" -type f -name "*.pyc" -delete 2>/dev/null
-    find "$HOME" -type f -name "*.pyo" -delete 2>/dev/null
+    find "$HOME" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+    find "$HOME" -type f -name "*.pyc" -delete 2>/dev/null || true
+    find "$HOME" -type f -name "*.pyo" -delete 2>/dev/null || true
     
     # Go cache
     show_progress $((++ops)) $total_ops "Checking Go cache"
@@ -2119,8 +2119,8 @@ optimize_browsers() {
     if [[ -f "$HOME/Library/Safari/History.db" ]]; then
         safe_remove "$HOME/Library/Safari/History.db-shm"
         safe_remove "$HOME/Library/Safari/History.db-wal"
-        sqlite3 "$HOME/Library/Safari/History.db" "VACUUM;" 2>/dev/null
-        sqlite3 "$HOME/Library/Safari/History.db" "REINDEX;" 2>/dev/null
+        sqlite3 "$HOME/Library/Safari/History.db" "VACUUM;" 2>/dev/null || true
+        sqlite3 "$HOME/Library/Safari/History.db" "REINDEX;" 2>/dev/null || true
         log_success "Safari database optimized"
     fi
     
@@ -2128,8 +2128,8 @@ optimize_browsers() {
     show_progress $((++ops)) $total_ops "Optimizing Chrome"
     if [[ -d "$HOME/Library/Application Support/Google/Chrome" ]]; then
         log_info "Chrome profile optimization:"
-        find "$HOME/Library/Application Support/Google/Chrome" -name "History" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
-        find "$HOME/Library/Application Support/Google/Chrome" -name "Cookies" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
+        find "$HOME/Library/Application Support/Google/Chrome" -name "History" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null || true
+        find "$HOME/Library/Application Support/Google/Chrome" -name "Cookies" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null || true
         log_success "Chrome databases optimized"
     fi
     
@@ -2137,8 +2137,8 @@ optimize_browsers() {
     show_progress $((++ops)) $total_ops "Optimizing Firefox"
     if [[ -d "$HOME/Library/Application Support/Firefox" ]]; then
         log_info "Firefox profile optimization:"
-        find "$HOME/Library/Application Support/Firefox" -name "places.sqlite" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
-        find "$HOME/Library/Application Support/Firefox" -name "cookies.sqlite" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
+        find "$HOME/Library/Application Support/Firefox" -name "places.sqlite" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null || true
+        find "$HOME/Library/Application Support/Firefox" -name "cookies.sqlite" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null || true
         log_success "Firefox databases optimized"
     fi
     
@@ -2146,7 +2146,7 @@ optimize_browsers() {
     show_progress $((++ops)) $total_ops "Optimizing Edge"
     if [[ -d "$HOME/Library/Application Support/Microsoft Edge" ]]; then
         log_info "Edge profile optimization:"
-        find "$HOME/Library/Application Support/Microsoft Edge" -name "History" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
+        find "$HOME/Library/Application Support/Microsoft Edge" -name "History" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null || true
         log_success "Edge databases optimized"
     fi
     
