@@ -566,8 +566,8 @@ cleanup_logs() {
     
     # System logs older than 7 days
     show_progress $((++ops)) $total_ops "Cleaning old system logs"
-    sudo find /var/log -type f -name "*.log" -mtime +7 -exec rm {} \; 2>/dev/null
-    sudo find /var/log -type f -name "*.log.*" -exec rm {} \; 2>/dev/null
+    sudo find /var/log -type f -name "*.log" -mtime +7 -exec rm {} \; 2>/dev/null || true
+    sudo find /var/log -type f -name "*.log.*" -exec rm {} \; 2>/dev/null || true
     
     # User logs
     show_progress $((++ops)) $total_ops "Cleaning user logs"
@@ -575,7 +575,7 @@ cleanup_logs() {
     
     # Application logs
     show_progress $((++ops)) $total_ops "Cleaning application logs"
-    find "$HOME/Library/Containers" -name "*.log" -type f -mtime +7 -delete 2>/dev/null
+    find "$HOME/Library/Containers" -name "*.log" -type f -mtime +7 -delete 2>/dev/null || true
     
     # Crash reports
     show_progress $((++ops)) $total_ops "Cleaning crash reports"
@@ -596,7 +596,7 @@ cleanup_logs() {
     
     # Audit logs (old)
     show_progress $((++ops)) $total_ops "Cleaning old audit logs"
-    sudo find /var/audit -type f -mtime +30 -delete 2>/dev/null
+    sudo find /var/audit -type f -mtime +30 -delete 2>/dev/null || true
     
     # Apache logs (if exists)
     show_progress $((++ops)) $total_ops "Cleaning Apache logs"
@@ -645,7 +645,7 @@ cleanup_temp() {
     
     # Application tmp folders
     show_progress $((++ops)) $total_ops "Cleaning application temp folders"
-    find "$HOME/Library/Application Support" -name "tmp" -type d -exec rm -rf {} + 2>/dev/null
+    find "$HOME/Library/Application Support" -name "tmp" -type d -exec rm -rf {} + 2>/dev/null || true
     
     # Saved Application State
     show_progress $((++ops)) $total_ops "Cleaning saved application states"
@@ -779,8 +779,8 @@ repair_permissions() {
     
     # Fix application permissions
     show_progress $((++ops)) $total_ops "Fixing application permissions"
-    sudo find /Applications -type d -exec chmod 755 {} \; 2>/dev/null
-    sudo find /Applications -type f -exec chmod 644 {} \; 2>/dev/null
+    sudo find /Applications -type d -exec chmod 755 {} \; 2>/dev/null || true
+    sudo find /Applications -type f -exec chmod 644 {} \; 2>/dev/null || true
     
     # Fix LaunchAgents/Daemons permissions
     show_progress $((++ops)) $total_ops "Fixing LaunchAgents/Daemons permissions"
@@ -806,45 +806,45 @@ optimize_databases() {
     # Mail database
     show_progress $((++ops)) $total_ops "Optimizing Mail database"
     if [ -d "$HOME/Library/Mail" ]; then
-        find "$HOME/Library/Mail" -name "Envelope Index" -delete 2>/dev/null
-        sqlite3 "$HOME/Library/Mail/V*/MailData/Envelope Index" "VACUUM;" 2>/dev/null
-        sqlite3 "$HOME/Library/Mail/V*/MailData/Envelope Index" "REINDEX;" 2>/dev/null
+        find "$HOME/Library/Mail" -name "Envelope Index" -delete 2>/dev/null || true
+        sqlite3 "$HOME/Library/Mail/V*/MailData/Envelope Index" "VACUUM;" 2>/dev/null || true
+        sqlite3 "$HOME/Library/Mail/V*/MailData/Envelope Index" "REINDEX;" 2>/dev/null || true
     fi
     
     # Safari databases
     show_progress $((++ops)) $total_ops "Optimizing Safari databases"
     for db in "$HOME/Library/Safari/"*.db; do
         if [ -f "$db" ]; then
-            sqlite3 "$db" "VACUUM;" 2>/dev/null
-            sqlite3 "$db" "REINDEX;" 2>/dev/null
+            sqlite3 "$db" "VACUUM;" 2>/dev/null || true
+            sqlite3 "$db" "REINDEX;" 2>/dev/null || true
         fi
     done
     
     # Photos database
     show_progress $((++ops)) $total_ops "Optimizing Photos database"
     if [ -d "$HOME/Pictures/Photos Library.photoslibrary" ]; then
-        sqlite3 "$HOME/Pictures/Photos Library.photoslibrary/database/photos.db" "VACUUM;" 2>/dev/null
-        sqlite3 "$HOME/Pictures/Photos Library.photoslibrary/database/photos.db" "REINDEX;" 2>/dev/null
+        sqlite3 "$HOME/Pictures/Photos Library.photoslibrary/database/photos.db" "VACUUM;" 2>/dev/null || true
+        sqlite3 "$HOME/Pictures/Photos Library.photoslibrary/database/photos.db" "REINDEX;" 2>/dev/null || true
     fi
     
     # Calendar database
     show_progress $((++ops)) $total_ops "Optimizing Calendar database"
     if [ -f "$HOME/Library/Calendars/Calendar Cache" ]; then
-        sqlite3 "$HOME/Library/Calendars/Calendar Cache" "VACUUM;" 2>/dev/null
-        sqlite3 "$HOME/Library/Calendars/Calendar Cache" "REINDEX;" 2>/dev/null
+        sqlite3 "$HOME/Library/Calendars/Calendar Cache" "VACUUM;" 2>/dev/null || true
+        sqlite3 "$HOME/Library/Calendars/Calendar Cache" "REINDEX;" 2>/dev/null || true
     fi
     
     # Messages database
     show_progress $((++ops)) $total_ops "Optimizing Messages database"
     if [ -f "$HOME/Library/Messages/chat.db" ]; then
-        sqlite3 "$HOME/Library/Messages/chat.db" "VACUUM;" 2>/dev/null
-        sqlite3 "$HOME/Library/Messages/chat.db" "REINDEX;" 2>/dev/null
+        sqlite3 "$HOME/Library/Messages/chat.db" "VACUUM;" 2>/dev/null || true
+        sqlite3 "$HOME/Library/Messages/chat.db" "REINDEX;" 2>/dev/null || true
     fi
     
     # Notes database
     show_progress $((++ops)) $total_ops "Optimizing Notes database"
-    find "$HOME/Library/Group Containers" -name "NoteStore.sqlite" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
-    find "$HOME/Library/Group Containers" -name "NoteStore.sqlite" -exec sqlite3 {} "REINDEX;" \; 2>/dev/null
+    find "$HOME/Library/Group Containers" -name "NoteStore.sqlite" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null || true
+    find "$HOME/Library/Group Containers" -name "NoteStore.sqlite" -exec sqlite3 {} "REINDEX;" \; 2>/dev/null || true
     
     # Cookies database
     show_progress $((++ops)) $total_ops "Optimizing Cookies database"
@@ -856,8 +856,8 @@ optimize_databases() {
     # Application Support databases
     show_progress $((++ops)) $total_ops "Optimizing Application Support databases"
     find "$HOME/Library/Application Support" -name "*.db" -o -name "*.sqlite" | while read db; do
-        sqlite3 "$db" "VACUUM;" 2>/dev/null
-        sqlite3 "$db" "REINDEX;" 2>/dev/null
+        sqlite3 "$db" "VACUUM;" 2>/dev/null || true
+        sqlite3 "$db" "REINDEX;" 2>/dev/null || true
     done
     
     complete_progress
@@ -1059,7 +1059,7 @@ cleanup_thumbnails() {
     
     # Finder cache
     show_progress $((++ops)) $total_ops "Cleaning Finder cache"
-    find "$HOME/Library/Caches/com.apple.finder" -type f -delete 2>/dev/null
+    find "$HOME/Library/Caches/com.apple.finder" -type f -delete 2>/dev/null || true
     
     # Restart Finder
     show_progress $((++ops)) $total_ops "Restarting Finder"
@@ -1095,7 +1095,7 @@ cleanup_quicklook() {
     
     # Restart QuickLook
     show_progress $((++ops)) $total_ops "Restarting QuickLook daemon"
-    killall QuickLookUIService 2>/dev/null
+    killall QuickLookUIService 2>/dev/null || true
     
     complete_progress
     COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
@@ -1119,9 +1119,9 @@ optimize_mail() {
     
     # Rebuild envelope index
     show_progress $((++ops)) $total_ops "Rebuilding Mail envelope index"
-    find "$HOME/Library/Mail" -name "Envelope Index" -delete 2>/dev/null
-    find "$HOME/Library/Mail" -name "Envelope Index-shm" -delete 2>/dev/null
-    find "$HOME/Library/Mail" -name "Envelope Index-wal" -delete 2>/dev/null
+    find "$HOME/Library/Mail" -name "Envelope Index" -delete 2>/dev/null || true
+    find "$HOME/Library/Mail" -name "Envelope Index-shm" -delete 2>/dev/null || true
+    find "$HOME/Library/Mail" -name "Envelope Index-wal" -delete 2>/dev/null || true
     
     # Clean Mail cache
     show_progress $((++ops)) $total_ops "Cleaning Mail cache"
@@ -1129,12 +1129,12 @@ optimize_mail() {
     
     # Optimize Mail databases
     show_progress $((++ops)) $total_ops "Optimizing Mail databases"
-    find "$HOME/Library/Mail" -name "*.db" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
-    find "$HOME/Library/Mail" -name "*.db" -exec sqlite3 {} "REINDEX;" \; 2>/dev/null
+    find "$HOME/Library/Mail" -name "*.db" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null || true
+    find "$HOME/Library/Mail" -name "*.db" -exec sqlite3 {} "REINDEX;" \; 2>/dev/null || true
     
     # Clean old downloads
     show_progress $((++ops)) $total_ops "Cleaning old Mail downloads"
-    find "$HOME/Library/Mail Downloads" -type f -mtime +30 -delete 2>/dev/null
+    find "$HOME/Library/Mail Downloads" -type f -mtime +30 -delete 2>/dev/null || true
     
     complete_progress
     COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
@@ -1165,11 +1165,11 @@ cleanup_icloud_cache() {
     
     # CloudKit cache
     show_progress $((++ops)) $total_ops "Cleaning CloudKit cache"
-    find "$HOME/Library/Caches" -name "*cloudkit*" -type d -exec rm -rf {} + 2>/dev/null
+    find "$HOME/Library/Caches" -name "*cloudkit*" -type d -exec rm -rf {} + 2>/dev/null || true
     
     # Restart cloudd
     show_progress $((++ops)) $total_ops "Restarting iCloud daemon"
-    killall cloudd 2>/dev/null
+    killall cloudd 2>/dev/null || true
     
     complete_progress
     COMPLETED_OPERATIONS=$((COMPLETED_OPERATIONS + 1))
@@ -1194,7 +1194,7 @@ cleanup_language_files() {
     # This is a safe operation that only removes .lproj folders except en.lproj
     find /Applications -name "*.lproj" -not -name "en*.lproj" -type d 2>/dev/null | while read dir; do
         sudo rm -rf "$dir" 2>/dev/null && log_info "Removed: $dir"
-    done
+    done || true
     
     show_progress $((++ops)) $total_ops "Calculating space freed"
     local space_after=$(df -k / | tail -1 | awk '{print $3}')
@@ -1488,7 +1488,7 @@ additional_optimizations() {
     # Clear notification center database
     show_progress $((++ops)) $total_ops "Clearing notification center"
     safe_remove "$HOME/Library/Application Support/NotificationCenter/*.db"
-    killall NotificationCenter 2>/dev/null
+    killall NotificationCenter 2>/dev/null || true
     
     # Clean up iOS device backups (old)
     show_progress $((++ops)) $total_ops "Checking iOS device backups"
@@ -1512,7 +1512,7 @@ additional_optimizations() {
     
     # Clear quarantine flags
     show_progress $((++ops)) $total_ops "Clearing download quarantine database"
-    sqlite3 "$HOME/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2" "DELETE FROM LSQuarantineEvent;" 2>/dev/null
+    sqlite3 "$HOME/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2" "DELETE FROM LSQuarantineEvent;" 2>/dev/null || true
     
     # Rebuild dyld cache
     show_progress $((++ops)) $total_ops "Updating dynamic linker cache"
@@ -1688,7 +1688,7 @@ perform_security_audit() {
             log_warning "Unsigned application: $(basename "$app")"
             unsigned_count=$((unsigned_count + 1))
         fi
-    done
+    done || true
     
     # Check SSH configuration
     show_progress $((++ops)) $total_ops "Checking SSH configuration"
@@ -2082,9 +2082,9 @@ optimize_app_caches() {
     # Python __pycache__
     show_progress $((++ops)) $total_ops "Cleaning Python cache files"
     log_info "Removing Python cache files..."
-    find "$HOME" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
-    find "$HOME" -type f -name "*.pyc" -delete 2>/dev/null
-    find "$HOME" -type f -name "*.pyo" -delete 2>/dev/null
+    find "$HOME" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+    find "$HOME" -type f -name "*.pyc" -delete 2>/dev/null || true
+    find "$HOME" -type f -name "*.pyo" -delete 2>/dev/null || true
     
     # Go cache
     show_progress $((++ops)) $total_ops "Checking Go cache"
@@ -2119,8 +2119,8 @@ optimize_browsers() {
     if [[ -f "$HOME/Library/Safari/History.db" ]]; then
         safe_remove "$HOME/Library/Safari/History.db-shm"
         safe_remove "$HOME/Library/Safari/History.db-wal"
-        sqlite3 "$HOME/Library/Safari/History.db" "VACUUM;" 2>/dev/null
-        sqlite3 "$HOME/Library/Safari/History.db" "REINDEX;" 2>/dev/null
+        sqlite3 "$HOME/Library/Safari/History.db" "VACUUM;" 2>/dev/null || true
+        sqlite3 "$HOME/Library/Safari/History.db" "REINDEX;" 2>/dev/null || true
         log_success "Safari database optimized"
     fi
     
@@ -2128,8 +2128,8 @@ optimize_browsers() {
     show_progress $((++ops)) $total_ops "Optimizing Chrome"
     if [[ -d "$HOME/Library/Application Support/Google/Chrome" ]]; then
         log_info "Chrome profile optimization:"
-        find "$HOME/Library/Application Support/Google/Chrome" -name "History" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
-        find "$HOME/Library/Application Support/Google/Chrome" -name "Cookies" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
+        find "$HOME/Library/Application Support/Google/Chrome" -name "History" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null || true
+        find "$HOME/Library/Application Support/Google/Chrome" -name "Cookies" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null || true
         log_success "Chrome databases optimized"
     fi
     
@@ -2137,8 +2137,8 @@ optimize_browsers() {
     show_progress $((++ops)) $total_ops "Optimizing Firefox"
     if [[ -d "$HOME/Library/Application Support/Firefox" ]]; then
         log_info "Firefox profile optimization:"
-        find "$HOME/Library/Application Support/Firefox" -name "places.sqlite" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
-        find "$HOME/Library/Application Support/Firefox" -name "cookies.sqlite" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
+        find "$HOME/Library/Application Support/Firefox" -name "places.sqlite" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null || true
+        find "$HOME/Library/Application Support/Firefox" -name "cookies.sqlite" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null || true
         log_success "Firefox databases optimized"
     fi
     
@@ -2146,7 +2146,7 @@ optimize_browsers() {
     show_progress $((++ops)) $total_ops "Optimizing Edge"
     if [[ -d "$HOME/Library/Application Support/Microsoft Edge" ]]; then
         log_info "Edge profile optimization:"
-        find "$HOME/Library/Application Support/Microsoft Edge" -name "History" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null
+        find "$HOME/Library/Application Support/Microsoft Edge" -name "History" -exec sqlite3 {} "VACUUM;" \; 2>/dev/null || true
         log_success "Edge databases optimized"
     fi
     
