@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ################################################################################
 # macOS Comprehensive Maintenance Script
@@ -6,7 +6,7 @@
 # Description: Exhaustive system maintenance with low-level operations
 ################################################################################
 
-set -o pipefail
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -32,31 +32,23 @@ WARNINGS=()
 SKIPPED_OPERATIONS=()
 
 # Operation categories with risk levels
-declare -A RISK_LEVELS=(
-    ["cache_cleanup"]="LOW"
-    ["log_cleanup"]="LOW"
-    ["temp_cleanup"]="LOW"
-    ["spotlight_rebuild"]="MEDIUM"
-    ["launchservices_rebuild"]="MEDIUM"
-    ["disk_check"]="LOW"
-    ["permission_repair"]="MEDIUM"
-    ["database_optimization"]="MEDIUM"
-    ["dns_flush"]="LOW"
-    ["daemon_operations"]="MEDIUM"
-    ["kext_rebuild"]="HIGH"
-    ["font_cache"]="LOW"
-    ["dock_reset"]="LOW"
-    ["thumbnail_cache"]="LOW"
-    ["quicklook_cache"]="LOW"
-    ["mail_optimization"]="MEDIUM"
-    ["network_reset"]="HIGH"
-    ["icloud_cache"]="MEDIUM"
-    ["language_cleanup"]="MEDIUM"
-    ["login_items"]="LOW"
-    ["system_updates"]="LOW"
-    ["app_updates"]="LOW"
-    ["driver_check"]="LOW"
-)
+# Using a function instead of associative array for Bash 3.x compatibility
+get_risk_level() {
+    case "$1" in
+        cache_cleanup|log_cleanup|temp_cleanup|disk_check|dns_flush|font_cache|dock_reset|thumbnail_cache|quicklook_cache|login_items|system_updates|app_updates|driver_check)
+            echo "LOW"
+            ;;
+        spotlight_rebuild|launchservices_rebuild|permission_repair|database_optimization|daemon_operations|mail_optimization|icloud_cache|language_cleanup)
+            echo "MEDIUM"
+            ;;
+        kext_rebuild|network_reset)
+            echo "HIGH"
+            ;;
+        *)
+            echo "UNKNOWN"
+            ;;
+    esac
+}
 
 ################################################################################
 # Logging Functions
@@ -101,13 +93,18 @@ show_progress() {
     local filled=$((percent / 2))
     local empty=$((50 - filled))
     
-    # Calculate ETA
+    # Calculate ETA - with division by zero protection
     local elapsed=$(($(date +%s) - START_TIME))
-    local rate=$(awk "BEGIN {print $current / $elapsed}")
-    local remaining=$((total - current))
-    local eta=$(awk "BEGIN {print int($remaining / $rate)}")
-    local eta_min=$((eta / 60))
-    local eta_sec=$((eta % 60))
+    local eta_min=0
+    local eta_sec=0
+    
+    if [ "$elapsed" -gt 0 ] && [ "$current" -gt 0 ]; then
+        local rate=$(awk "BEGIN {printf \"%.4f\", $current / $elapsed}")
+        local remaining=$((total - current))
+        local eta=$(awk "BEGIN {if ($rate > 0) print int($remaining / $rate); else print 0}")
+        eta_min=$((eta / 60))
+        eta_sec=$((eta % 60))
+    fi
     
     printf "\r${CYAN}Progress: [${GREEN}"
     printf '%*s' "$filled" | tr ' ' '█'
@@ -128,7 +125,7 @@ complete_progress() {
 confirm_operation() {
     local category=$1
     local description=$2
-    local risk=${RISK_LEVELS[$category]:-UNKNOWN}
+    local risk=$(get_risk_level "$category")
     
     echo ""
     echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -493,7 +490,14 @@ repair_permissions() {
     
     # Reset home folder permissions
     show_progress $((++ops)) $total_ops "Resetting home folder permissions"
-    diskutil resetUserPermissions / $(id -u) 2>&1 | tee -a "$LOG_FILE"
+    if ! diskutil resetUserPermissions / $(id -u) 2>&1 | tee -a "$LOG_FILE"; then
+        # Error -69841 is a known issue that can be safely ignored
+        if grep -q "\-69841" "$LOG_FILE"; then
+            log_warning "Permission reset returned error -69841 (known issue, can be ignored)"
+        else
+            log_error "Permission reset failed with unexpected error"
+        fi
+    fi
     
     # Repair system permissions (modern macOS)
     show_progress $((++ops)) $total_ops "Verifying system file permissions"
@@ -1014,7 +1018,11 @@ check_system_updates() {
     # Check for available updates
     show_progress $((++ops)) $total_ops "Checking for macOS updates"
     log_info "Checking for available system updates..."
-    softwareupdate --list 2>&1 | tee -a "$LOG_FILE"
+    if softwareupdate --list 2>&1 | tee -a "$LOG_FILE"; then
+        log_info "System update check completed"
+    else
+        log_warning "System update check failed - network may be unavailable"
+    fi
     
     # Show current macOS version
     show_progress $((++ops)) $total_ops "Checking current macOS version"
@@ -1059,14 +1067,17 @@ check_app_updates() {
     show_progress $((++ops)) $total_ops "Checking Homebrew packages"
     if command -v brew &> /dev/null; then
         log_info "Homebrew is installed - checking for outdated packages"
-        brew update 2>&1 | tee -a "$LOG_FILE"
-        local outdated=$(brew outdated | wc -l | tr -d ' ')
-        if [ "$outdated" -gt 0 ]; then
-            log_warning "Found $outdated outdated Homebrew packages:"
-            brew outdated 2>&1 | tee -a "$LOG_FILE"
-            log_info "To update: brew upgrade"
+        if brew update 2>&1 | tee -a "$LOG_FILE"; then
+            local outdated=$(brew outdated 2>/dev/null | wc -l | tr -d ' ')
+            if [ "$outdated" -gt 0 ]; then
+                log_warning "Found $outdated outdated Homebrew packages:"
+                brew outdated 2>&1 | tee -a "$LOG_FILE"
+                log_info "To update: brew upgrade"
+            else
+                log_success "All Homebrew packages are up to date"
+            fi
         else
-            log_success "All Homebrew packages are up to date"
+            log_warning "Homebrew update check failed - network may be unavailable"
         fi
     else
         log_info "Homebrew not installed (optional package manager)"
@@ -1076,8 +1087,11 @@ check_app_updates() {
     show_progress $((++ops)) $total_ops "Checking App Store updates"
     if command -v mas &> /dev/null; then
         log_info "Checking App Store for updates..."
-        mas outdated 2>&1 | tee -a "$LOG_FILE"
-        log_info "To update App Store apps: mas upgrade"
+        if mas outdated 2>&1 | tee -a "$LOG_FILE"; then
+            log_info "To update App Store apps: mas upgrade"
+        else
+            log_warning "App Store update check failed - network may be unavailable"
+        fi
     else
         log_info "mas-cli not installed - check App Store manually for updates"
         log_info "Install mas-cli with: brew install mas"
@@ -1087,7 +1101,11 @@ check_app_updates() {
     show_progress $((++ops)) $total_ops "Checking npm global packages"
     if command -v npm &> /dev/null; then
         log_info "Checking outdated npm global packages..."
-        npm outdated -g 2>&1 | tee -a "$LOG_FILE" || log_info "All npm packages up to date"
+        if npm outdated -g 2>&1 | tee -a "$LOG_FILE"; then
+            log_info "npm global packages check completed"
+        else
+            log_warning "npm update check failed - network may be unavailable"
+        fi
     else
         log_info "npm not installed"
     fi
@@ -1096,7 +1114,11 @@ check_app_updates() {
     show_progress $((++ops)) $total_ops "Checking pip packages"
     if command -v pip3 &> /dev/null; then
         log_info "Checking outdated pip packages..."
-        pip3 list --outdated 2>&1 | tee -a "$LOG_FILE" || log_info "All pip packages up to date"
+        if timeout 30 pip3 list --outdated 2>&1 | tee -a "$LOG_FILE"; then
+            log_info "pip packages check completed"
+        else
+            log_warning "pip update check failed - network may be unavailable or timeout reached"
+        fi
     else
         log_info "pip3 not installed"
     fi
@@ -1462,7 +1484,12 @@ main() {
     echo ""
     read -p "Press Enter to continue or Ctrl+C to abort..."
     
-    # Execute maintenance operations
+    # Execute maintenance operations in order
+    # Network-dependent operations MUST run before network reset
+    check_system_updates
+    check_app_updates
+    
+    # Regular maintenance operations
     cleanup_caches
     cleanup_logs
     cleanup_temp
@@ -1482,11 +1509,11 @@ main() {
     cleanup_icloud_cache
     cleanup_language_files
     check_login_items
-    reset_network
-    check_system_updates
-    check_app_updates
     check_drivers_hardware
     additional_optimizations
+    
+    # Network reset should be last among network operations
+    reset_network
     
     # Generate report
     generate_report
