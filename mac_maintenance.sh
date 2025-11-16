@@ -1438,7 +1438,8 @@ check_drivers_hardware() {
     # Check USB devices and drivers
     show_progress $((++ops)) $total_ops "Checking USB devices"
     log_info "USB devices connected:"
-    system_profiler SPUSBDataType 2>/dev/null | grep -A 5 "Product ID\|Manufacturer" | head -30 | tee -a "$LOG_FILE"
+    # Use subshell to prevent SIGPIPE from terminating the script
+    (system_profiler SPUSBDataType 2>/dev/null | grep -A 5 "Product ID\|Manufacturer" | head -30 || true) | tee -a "$LOG_FILE"
     
     # Check Bluetooth status
     show_progress $((++ops)) $total_ops "Checking Bluetooth status"
@@ -1464,7 +1465,8 @@ check_drivers_hardware() {
     # Check for kernel extensions
     show_progress $((++ops)) $total_ops "Checking loaded kernel extensions"
     log_info "Non-Apple kernel extensions:"
-    kextstat | grep -v com.apple | head -20 | tee -a "$LOG_FILE"
+    # Use subshell to prevent SIGPIPE from terminating the script
+    (kextstat | grep -v com.apple | head -20 || true) | tee -a "$LOG_FILE"
     
     # Check system load and performance
     show_progress $((++ops)) $total_ops "Checking system performance"
@@ -1562,7 +1564,9 @@ manage_memory() {
     # Top memory consumers
     show_progress $((++ops)) $total_ops "Identifying top memory consumers"
     log_info "Top 10 memory consumers:"
-    ps aux | sort -rk 4 | head -11 | tee -a "$LOG_FILE"
+    # Use subshell to prevent SIGPIPE from terminating the script
+    # when head closes the pipe early (exit code 141)
+    (ps aux | sort -rk 4 | head -11 || true) | tee -a "$LOG_FILE"
     
     # Purge inactive memory
     show_progress $((++ops)) $total_ops "Purging inactive memory"
@@ -1883,7 +1887,8 @@ monitor_thermal_status() {
     # Check fan speed and thermal pressure
     show_progress $((++ops)) $total_ops "Checking fan and thermal status"
     log_info "System thermal status:"
-    sudo powermetrics --samplers smc -i 1 -n 1 2>&1 | grep -i "fan\|thermal" | head -10 | tee -a "$LOG_FILE"
+    # Use subshell to prevent SIGPIPE from terminating the script
+    (sudo powermetrics --samplers smc -i 1 -n 1 2>&1 | grep -i "fan\|thermal" | head -10 || true) | tee -a "$LOG_FILE"
     
     # CPU usage
     show_progress $((++ops)) $total_ops "Checking CPU usage"
@@ -1915,7 +1920,9 @@ find_large_files() {
     
     # Find files larger than 100MB, excluding system and backup locations
     show_progress $((++ops)) $total_ops "Generating report"
-    sudo find / -type f -size +100M \
+    # Use subshell to prevent SIGPIPE from terminating the script
+    # when head closes the pipe early (exit code 141)
+    (sudo find / -type f -size +100M \
         -not -path "*/Library/Application Support/MobileSync/Backup/*" \
         -not -path "*/Backups.backupdb/*" \
         -not -path "*/System/*" \
@@ -1923,7 +1930,7 @@ find_large_files() {
         -not -path "*/.Spotlight-V100/*" \
         -not -path "*/.fseventsd/*" \
         -exec du -h {} \; 2>/dev/null | \
-        sort -rh | head -50 | tee -a "$LOG_FILE"
+        sort -rh | head -50 || true) | tee -a "$LOG_FILE"
     
     log_info "Review and delete large unnecessary files manually"
     
@@ -2231,8 +2238,10 @@ analyze_system_logs() {
     # Application crashes
     show_progress $((++ops)) $total_ops "Checking for application crashes"
     log_info "Recent application crashes (last 7 days):"
-    find "$HOME/Library/Logs/DiagnosticReports" -name "*.crash" -mtime -7 -exec basename {} \; 2>/dev/null | \
-        sort | uniq -c | sort -rn | head -10 | tee -a "$LOG_FILE"
+    # Use subshell to prevent SIGPIPE from terminating the script
+    # when head closes the pipe early (exit code 141)
+    (find "$HOME/Library/Logs/DiagnosticReports" -name "*.crash" -mtime -7 -exec basename {} \; 2>/dev/null | \
+        sort | uniq -c | sort -rn | head -10 || true) | tee -a "$LOG_FILE"
     
     # Disk errors
     show_progress $((++ops)) $total_ops "Checking for disk errors"
