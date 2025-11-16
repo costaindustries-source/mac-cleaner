@@ -243,6 +243,194 @@ confirm_operation() {
 # Utility Functions
 ################################################################################
 
+usage() {
+    cat << EOF
+${BOLD}${CYAN}macOS Comprehensive Maintenance Script v${SCRIPT_VERSION}${NC}
+
+${BOLD}USAGE:${NC}
+    $(basename "$0") [OPTIONS]
+
+${BOLD}DESCRIPTION:${NC}
+    Comprehensive macOS maintenance script for deep system cleaning and optimization.
+    Performs 37+ maintenance operations including cache cleanup, memory management,
+    security audit, backup verification, and much more.
+
+${BOLD}OPTIONS:${NC}
+    -h, --help              Show this help message and exit
+    -v, --verbose           Enable verbose output (debug logging)
+    -y, --yes               Auto-confirm all operations (no prompts)
+    -o, --operation <name>  Run only a specific operation
+    -l, --list              List all available operations and exit
+    --no-color              Disable color output
+    --skip <operation>      Skip a specific operation
+    --only-risk <level>     Only run operations of specific risk level (LOW/MEDIUM/HIGH)
+    --version               Show version and exit
+
+${BOLD}EXAMPLES:${NC}
+    # Interactive mode (default)
+    ./mac_maintenance.sh
+
+    # Verbose mode with all operations auto-confirmed
+    ./mac_maintenance.sh --verbose --yes
+
+    # Run only low-risk operations
+    ./mac_maintenance.sh --only-risk LOW
+
+    # Run specific operation
+    ./mac_maintenance.sh --operation cache_cleanup
+
+    # List all available operations
+    ./mac_maintenance.sh --list
+
+${BOLD}RISK LEVELS:${NC}
+    ${GREEN}LOW${NC}     - Safe operations (cache cleanup, diagnostics, verification)
+    ${YELLOW}MEDIUM${NC}  - May require restart (database optimization, rebuilds)
+    ${RED}HIGH${NC}    - Significant changes (kernel cache, network reset)
+
+${BOLD}NOTES:${NC}
+    - Script requires sudo for some operations
+    - Always ensure you have recent backups before running
+    - System restart recommended after completion
+    - Detailed logs saved to /tmp/mac_maintenance_*.log
+    - Report generated on Desktop
+
+${BOLD}OPERATIONS PERFORMED:${NC}
+    See --list for complete operation list
+
+For more information, visit: https://github.com/costaindustries-source/mac-cleaner
+EOF
+}
+
+list_operations() {
+    echo -e "${BOLD}${CYAN}Available Operations (37 total):${NC}\n"
+    
+    echo -e "${GREEN}LOW RISK Operations:${NC}"
+    echo "  1.  cache_cleanup          - Clean system and application caches"
+    echo "  2.  log_cleanup            - Clean system and application logs"
+    echo "  3.  temp_cleanup           - Clean temporary files"
+    echo "  4.  disk_check             - Verify and repair disk"
+    echo "  5.  dns_flush              - Flush DNS cache"
+    echo "  6.  font_cache             - Clean font caches"
+    echo "  7.  dock_reset             - Reset Dock"
+    echo "  8.  thumbnail_cache        - Clean thumbnail caches"
+    echo "  9.  quicklook_cache        - Clean QuickLook cache"
+    echo "  10. login_items            - Review login items"
+    echo "  11. system_updates         - Check for system updates"
+    echo "  12. app_updates            - Check for application updates"
+    echo "  13. driver_check           - Check hardware and drivers"
+    echo "  14. security_audit         - Comprehensive security audit"
+    echo "  15. backup_verification    - Verify Time Machine backups"
+    echo "  16. network_diagnostics    - Network diagnostics"
+    echo "  17. thermal_monitoring     - Monitor system temperature"
+    echo "  18. large_file_finder      - Find large files"
+    echo "  19. duplicate_finder       - Find duplicate files"
+    echo "  20. startup_optimization   - Analyze startup configuration"
+    echo "  21. log_analysis           - Analyze system logs"
+    
+    echo -e "\n${YELLOW}MEDIUM RISK Operations:${NC}"
+    echo "  22. spotlight_rebuild      - Rebuild Spotlight index"
+    echo "  23. launchservices_rebuild - Rebuild LaunchServices"
+    echo "  24. permission_repair      - Repair disk permissions"
+    echo "  25. database_optimization  - Optimize system databases"
+    echo "  26. daemon_operations      - Reload system daemons"
+    echo "  27. mail_optimization      - Optimize Mail.app"
+    echo "  28. icloud_cache           - Clean iCloud cache"
+    echo "  29. language_cleanup       - Remove unused language files"
+    echo "  30. memory_management      - Memory analysis and optimization"
+    echo "  31. apfs_snapshots         - Manage APFS snapshots"
+    echo "  32. app_cache_optimization - Clean development tool caches"
+    echo "  33. browser_optimization   - Optimize browser databases"
+    echo "  34. privacy_cleanup        - Clean privacy-sensitive data"
+    
+    echo -e "\n${RED}HIGH RISK Operations:${NC}"
+    echo "  35. kext_rebuild           - Rebuild kernel extension cache"
+    echo "  36. network_reset          - Reset network configuration"
+    
+    echo -e "\n${CYAN}Additional:${NC}"
+    echo "  37. additional_optimizations - Various system tweaks"
+    
+    echo ""
+}
+
+parse_arguments() {
+    local SINGLE_OPERATION=""
+    local ONLY_RISK=""
+    local SKIP_OPERATIONS=()
+    
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            -v|--verbose)
+                VERBOSE=true
+                log_debug "Verbose mode enabled"
+                ;;
+            -y|--yes)
+                AUTO_CONFIRM=true
+                log_info "Auto-confirm mode enabled"
+                ;;
+            -o|--operation)
+                if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                    echo -e "${RED}Error: --operation requires an argument${NC}"
+                    echo "Use --list to see available operations"
+                    exit 1
+                fi
+                SINGLE_OPERATION="$2"
+                shift
+                ;;
+            -l|--list)
+                list_operations
+                exit 0
+                ;;
+            --no-color)
+                # Disable colors
+                RED=''
+                GREEN=''
+                YELLOW=''
+                BLUE=''
+                MAGENTA=''
+                CYAN=''
+                NC=''
+                BOLD=''
+                ;;
+            --skip)
+                if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                    echo -e "${RED}Error: --skip requires an argument${NC}"
+                    exit 1
+                fi
+                SKIP_OPERATIONS+=("$2")
+                shift
+                ;;
+            --only-risk)
+                if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                    echo -e "${RED}Error: --only-risk requires an argument${NC}"
+                    echo "Valid values: LOW, MEDIUM, HIGH"
+                    exit 1
+                fi
+                ONLY_RISK="$2"
+                shift
+                ;;
+            --version)
+                echo "macOS Maintenance Script v$SCRIPT_VERSION"
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}Error: Unknown option: $1${NC}"
+                echo "Use --help for usage information"
+                exit 1
+                ;;
+        esac
+        shift
+    done
+    
+    # Export for use in other functions
+    export SINGLE_OPERATION
+    export ONLY_RISK
+    export SKIP_OPERATIONS
+}
+
 check_sudo() {
     if [ "$EUID" -ne 0 ]; then
         log_info "This script requires sudo privileges for some operations"
@@ -2379,6 +2567,9 @@ main() {
         fi
     fi
 }
+
+# Parse command-line arguments
+parse_arguments "$@"
 
 # Run main function
 main
